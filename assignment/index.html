@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Clock</title>
+  <style>
+    :root {
+      --bg: #0f1226;
+      --fg: #eef1ff;
+      --muted: #a7b3ff;
+      --accent: #8aa0ff;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7f8ff;
+        --fg: #0e1326;
+        --muted: #606b9a;
+        --accent: #4253ff;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: var(--fg);
+      background: radial-gradient(1000px 600px at 20% 20%, rgba(138, 160, 255, 0.12), transparent),
+                  radial-gradient(1000px 600px at 80% 80%, rgba(66, 83, 255, 0.10), transparent),
+                  var(--bg);
+    }
+
+    .clock-card {
+      width: min(92vw, 680px);
+      padding: 2.25rem 2rem;
+      border-radius: 1.25rem;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .time {
+      font-size: clamp(2.5rem, 8.5vw, 6rem);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      line-height: 1;
+      text-shadow: 0 2px 18px rgba(138, 160, 255, 0.35);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .date {
+      margin-top: .5rem;
+      font-size: clamp(.95rem, 2.5vw, 1.15rem);
+      color: var(--muted);
+      letter-spacing: .04em;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: .75rem 1rem;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+
+    .switch {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .switch input { display: none; }
+
+    .toggle {
+      width: 46px; height: 26px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+      position: relative;
+      transition: background .25s ease;
+    }
+
+    .knob {
+      position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--fg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      transition: left .25s ease;
+    }
+
+    input:checked + .toggle { background: rgba(138,160,255,.35); }
+    input:checked + .toggle .knob { left: 23px; }
+
+    .footer {
+      margin-top: 1.25rem;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75rem;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .tz {
+      padding: .5rem .75rem;
+      border-radius: .75rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--fg);
+    }
+
+    /* Optional blinking colon effect */
+    .blink { animation: blink 1s steps(1, end) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <main class="clock-card" aria-live="polite">
+    <div class="row">
+      <div>
+        <div id="time" class="time" aria-label="Current time">00:00:00</div>
+        <div id="date" class="date" aria-label="Current date">—</div>
+      </div>
+      <div class="controls">
+        <label class="switch" title="Toggle 12/24-hour format">
+          <input id="toggle12" type="checkbox" />
+          <span class="toggle"><span class="knob"></span></span>
+          <span>12-hour</span>
+        </label>
+      </div>
+    </div>
+    <div class="footer">
+      <span id="tzLabel">Local Time</span>
+      <select id="tz" class="tz" aria-label="Time zone">
+        <option value="local" selected>System Default</option>
+        <option value="UTC">UTC</option>
+        <option value="Asia/Kathmandu">Asia/Kathmandu</option>
+        <option value="Asia/Kolkata">Asia/Kolkata</option>
+        <option value="America/New_York">America/New_York</option>
+        <option value="Europe/London">Europe/London</option>
+        <option value="Asia/Tokyo">Asia/Tokyo</option>
+      </select>
+    </div>
+  </main>
+
+  <script>
+    const timeEl = document.getElementById('time');
+    const dateEl = document.getElementById('date');
+    const toggle12 = document.getElementById('toggle12');
+    const tzSelect = document.getElementById('tz');
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatTime(now, use12) {
+      let hours = now.getHours();
+      const mins = now.getMinutes();
+      const secs = now.getSeconds();
+      if (use12) {
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        return `${pad(hours)}:${pad(mins)}:${pad(secs)} ${ampm}`;
+      }
+      return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+    }
+
+    function getDateInZone(zone) {
+      if (zone === 'local') return new Date();
+      const fmt = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const parts = Object.fromEntries(fmt.formatToParts(new Date()).map(p => [p.type, p.value]));
+      return new Date(`${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}Z`);
+    }
+
+    function render() {
+      const zone = tzSelect.value;
+      const now = getDateInZone(zone);
+      const use12 = toggle12.checked;
+
+      // Update time
+      timeEl.textContent = formatTime(now, use12);
+
+      // Optional blinking colons: replace ":" with spans
+      timeEl.innerHTML = timeEl.textContent.replaceAll(':', '<span class="blink">:</span>');
+
+      // Update date (weekday, Month Day, Year)
+      const dateFmt = new Intl.DateTimeFormat(undefined, { timeZone: zone === 'local' ? undefined : zone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      dateEl.textContent = dateFmt.format(new Date());
+    }
+
+    // Kick off
+    render();
+    setInterval(render, 1000);
+
+    // Persist preferences
+    const saved12 = localStorage.getItem('clock-12h');
+    const savedTZ = localStorage.getItem('clock-tz');
+    if (saved12 !== null) toggle12.checked = saved12 === 'true';
+    if (savedTZ) tzSelect.value = savedTZ;
+    render();
+
+    toggle12.addEventListener('change', () => {
+      localStorage.setItem('clock-12h', String(toggle12.checked));
+      render();
+    });
+    tzSelect.addEventListener('change', () => {
+      localStorage.setItem('clock-tz', tzSelect.value);
+      render();
+    });
+  </script>
+</body>
+</html>
